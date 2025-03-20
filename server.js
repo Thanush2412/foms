@@ -8,18 +8,26 @@ const app = express();
 const PORT = process.env.PORT || 3000; // Use environment PORT if available
 
 const DATA_FILE = path.join(__dirname, "submissions.json");
-const BROCHURE_FILE = path.join(__dirname, "public/broucher.pdf"); // Inside /public/
+// Change the brochure file name and path here, if necessary
+const BROCHURE_FILE = path.join(__dirname, "brochure.pdf"); // Just use a simple name for your brochure file
 
 // Middleware
 app.use(express.json());
 app.use(cors());
 
-// Serve static files from /public/
-app.use("/public", express.static(path.join(__dirname, "public")));
-
 // Ensure `submissions.json` exists
 if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify({}, null, 2));
+}
+
+// Read existing submissions (optimized to keep data in memory)
+let submissions = {};
+if (fs.existsSync(DATA_FILE)) {
+    try {
+        submissions = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    } catch (error) {
+        console.error("Error reading JSON:", error);
+    }
 }
 
 // ✅ Registration API (now under `/api/register`)
@@ -31,22 +39,12 @@ app.post("/api/register", (req, res) => {
         return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Read existing data
-    let submissions = {};
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            submissions = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-        } catch (error) {
-            console.error("Error reading JSON:", error);
-        }
-    }
-
     // Prevent duplicate phone numbers
     if (submissions[phone]) {
         return res.status(409).json({ message: "Already registered" });
     }
 
-    // Save new submission
+    // Save new submission in memory and then to file
     submissions[phone] = { name, email, phone, group, school, location };
     fs.writeFileSync(DATA_FILE, JSON.stringify(submissions, null, 2));
 
@@ -59,22 +57,16 @@ app.get("/api/download", (req, res) => {
         return res.status(404).json({ message: "Brochure not found" });
     }
 
-    res.download(BROCHURE_FILE, "broucher.pdf");
+    res.download(BROCHURE_FILE, "brochure.pdf", (err) => {
+        if (err) {
+            console.error("Error downloading brochure:", err);
+            return res.status(500).json({ message: "Error downloading brochure" });
+        }
+    });
 });
 
 // ✅ Download Submissions as Excel File (now under `/api/download-excel`)
 app.get("/api/download-excel", async (req, res) => {
-    // Read submissions data
-    let submissions = {};
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            submissions = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-        } catch (error) {
-            console.error("Error reading JSON:", error);
-            return res.status(500).json({ message: "Error reading submissions data" });
-        }
-    }
-
     // If no submissions exist, return a message
     if (Object.keys(submissions).length === 0) {
         return res.status(404).json({ message: "No submissions found" });
@@ -112,5 +104,5 @@ app.get("/api/download-excel", async (req, res) => {
 
 // ✅ Start the server
 app.listen(PORT, () => {
-    console.log(`🚀 API running at https://forms.faceprepdev.shop/api/`);
+    console.log(`🚀 API running at https://foms-55p9.onrender.com/api/`);
 });
